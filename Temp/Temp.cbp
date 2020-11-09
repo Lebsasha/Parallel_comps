@@ -32,6 +32,9 @@
 			<Add option="-Wall" />
 			<Add option="-fexceptions -fopenmp" />
 		</Compiler>
+		<Linker>
+			<Add option="-fopenmp" />
+		</Linker>
 		<Unit filename="main.cpp" />
 		<Extensions>
 			<envvars />
