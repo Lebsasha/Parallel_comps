@@ -31,7 +31,11 @@
 		<Compiler>
 			<Add option="-Wall" />
 			<Add option="-fexceptions -fopenmp" />
+			<Add directory="/usr/include/x86_64-linux-gnu/mpich/" />
 		</Compiler>
+		<Linker>
+			<Add directory="/usr/include/x86_64-linux-gnu/mpich/" />
+		</Linker>
 		<Unit filename="main.cpp" />
 		<Extensions>
 			<envvars />
