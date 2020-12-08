@@ -69,15 +69,15 @@ int main(int argc, char** argv)
         for (int i = 0; i < p; ++i)
         {
             if (i != q)
-                MPI_Send(B + i * m, m - i, MPI_INT, i, 0, MPI_COMM_WORLD);
+                MPI_Send(B + displs[i], counts[i], MPI_INT, i, 0, MPI_COMM_WORLD);
             else
-                MPI_Sendrecv(B + i * m, m - i, MPI_INT, q, 0, recvbuf, m - i, MPI_INT, q, 0, MPI_COMM_WORLD, &status);
+                MPI_Sendrecv(B + displs[i], counts[i], MPI_INT, i, 0, recvbuf, counts[i], MPI_INT, i, 0, MPI_COMM_WORLD, &status);
         }
     }
 //    View(A, n, m);
     //MPI_Scatterv(B, counts, displs, MPI_INT, recvbuf, counts[my_rank], MPI_INT, q, MPI_COMM_WORLD);
     if (my_rank != q)
-        MPI_Recv(recvbuf, m - my_rank, MPI_INT, q, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(recvbuf, counts[my_rank], MPI_INT, q, 0, MPI_COMM_WORLD, &status);
     for (int* ptr = A; ptr < A + n * m; ++ptr)
         *ptr = 0;
     for (int* ptr = A + k * m; ptr < A + (k + 1) * m; ++ptr, ++recvbuf)
