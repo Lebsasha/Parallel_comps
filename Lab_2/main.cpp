@@ -31,7 +31,7 @@ int main(int argc, char** argv)
     const int n = 4;
     const int m = 5;
     const int k = 2;
-    const int q = 1;
+    const int q = 2;
     assert(k < n);
     assert(p <= m);
     assert(q < p);
@@ -42,15 +42,6 @@ int main(int argc, char** argv)
     int* recvbuf = new int[m];
     int* counts = new int[p];
     int* displs = new int[p];
-    if (my_rank == q)
-    {
-        B = new int[p * m];
-        for (int i = 0; i < p; ++i)
-            for (int j = 0; j < m; ++j)
-            {
-                B[i * m + j] = i;
-            }
-    }
     for (int* ptr = A; ptr < A + n * m; ++ptr)
     {
         *ptr = my_rank;
@@ -67,9 +58,26 @@ int main(int argc, char** argv)
     {
         recvbuf[i] = 0;
     }
+    if (my_rank == q)
+    {
+        B = new int[p * m];
+        for (int i = 0; i < p; ++i)
+            for (int j = 0; j < m; ++j)
+            {
+                B[i * m + j] = i;
+            }
+        for (int i = 0; i < p; ++i)
+        {
+            if (i != q)
+                MPI_Send(B + i * m, m - i, MPI_INT, i, 0, MPI_COMM_WORLD);
+            else
+                MPI_Sendrecv(B + i * m, m - i, MPI_INT, q, 0, recvbuf, m - i, MPI_INT, q, 0, MPI_COMM_WORLD, &status);
+        }
+    }
 //    View(A, n, m);
-    MPI_Scatterv(B, counts, displs, MPI_INT, recvbuf, counts[my_rank], MPI_INT, q, MPI_COMM_WORLD);
-
+    //MPI_Scatterv(B, counts, displs, MPI_INT, recvbuf, counts[my_rank], MPI_INT, q, MPI_COMM_WORLD);
+    if (my_rank != q)
+        MPI_Recv(recvbuf, m - my_rank, MPI_INT, q, 0, MPI_COMM_WORLD, &status);
     for (int* ptr = A; ptr < A + n * m; ++ptr)
         *ptr = 0;
     for (int* ptr = A + k * m; ptr < A + (k + 1) * m; ++ptr, ++recvbuf)
