@@ -72,9 +72,9 @@ int main(int argc, char** argv)
         D = new int[n * n];
         for (int i = 0; i < n * n; ++i)
         {
-            A[i] = i+1;
-            B[i] = i+1;
-            C[i] = i+1;
+            A[i] = i + 1;
+            B[i] = i + 1;
+            C[i] = i + 1;
             D[i] = 666;
         }
         buffer = new int[n];
@@ -82,11 +82,11 @@ int main(int argc, char** argv)
         process_on_j_active = new bool[p];
         for (int k = 0; k < p; ++k)
         {
-            process_on_i_active[k]=true;
-            process_on_j_active[k]=true;
+            process_on_i_active[k] = true;
+            process_on_j_active[k] = true;
         }
-        general_offset_i=0;
-        general_offset_j=0;
+        general_offset_i = 0;
+        general_offset_j = 0;
     }
 
     begg:
@@ -105,12 +105,12 @@ int main(int argc, char** argv)
             {
                 /// C2
                 receive(n, A_row);
-                d=0;
+                d = 0;
                 for (int k = 0; k < n; ++k)
                 {
                     d += A_row[k] * (B_col[k] + C_col[k]);
                 }
-                cout<<my_rank<<" = "<<d<<endl;
+                cout << my_rank << " = " << d << endl;
                 send(1, &d, q);
                 //MPI_Gather(&d, 1, MPI_INT, buffer, p, 1, q, MPI_COMM_WORLD);
                 /// EC2
@@ -137,16 +137,16 @@ int main(int argc, char** argv)
             for (int k = 0; process_on_j_active[k] && k < p; ++k)/// B_Col
             {
                 for (int m = 0; m < n; ++m)
-                    buffer[m] = B[m * n + general_offset_j+k];
+                    buffer[m] = B[m * n + general_offset_j + k];
                 if (k != q)
                     send(n, buffer, k);
                 else
                     MPI_Sendrecv(buffer, n, MPI_INT, k, 0, B_col, n, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
             }
-            for (int k = 0; process_on_j_active[k]&& k < p; ++k)/// C_Col
+            for (int k = 0; process_on_j_active[k] && k < p; ++k)/// C_Col
             {
                 for (int m = 0; m < n; ++m)
-                    buffer[m] = C[m * n + general_offset_j+k];
+                    buffer[m] = C[m * n + general_offset_j + k];
                 if (k != q)
                     MPI_Send(buffer, n, MPI_INT, k, 0, MPI_COMM_WORLD);
                 else
@@ -165,9 +165,9 @@ int main(int argc, char** argv)
                         MPI_Sendrecv(A + (general_offset_i + k) * n, n, MPI_INT, k, 0, A_row, n, MPI_INT, k, 0, MPI_COMM_WORLD,
                                      &status);
                 }
-                if(process_on_i_active[q])
+                if (process_on_i_active[q])
                 {
-                    d=0;
+                    d = 0;
                     for (int k = 0; k < n; ++k)/// Compute
                     {
                         d += A_row[k] * (B_col[k] + C_col[k]);
@@ -175,11 +175,12 @@ int main(int argc, char** argv)
                 }
                 for (int k = 0; process_on_i_active[k] && k < p; ++k)
                 {
-                    if(k!=q)
-                        receive(1, D + (general_offset_i + k) * n+general_offset_j, MPI_INT, k);
+                    if (k != q)
+                        receive(1, D + (general_offset_i + k) * n + general_offset_j, MPI_INT, k);
                     else
                     {
-                        MPI_Sendrecv(&d, 1, MPI_INT, k, 0, D + (general_offset_i + k) * n +general_offset_j, 1, MPI_INT, k, 0, MPI_COMM_WORLD,
+                        MPI_Sendrecv(&d, 1, MPI_INT, k, 0, D + (general_offset_i + k) * n + general_offset_j, 1, MPI_INT, k, 0,
+                                     MPI_COMM_WORLD,
                                      &status);
                     }
 
@@ -195,9 +196,9 @@ int main(int argc, char** argv)
 //            assert(general_offset_i < n);
                 if (general_offset_i >= n)
                 {
-                    for (int k = 0; process_on_i_active[k]&& k < p; ++k)/// If last signal is needed
+                    for (int k = 0; process_on_i_active[k] && k < p; ++k)/// If last signal is needed
                     {
-                        process_on_i_active[k]=false;
+                        process_on_i_active[k] = false;
                         if (k != q)
                             send(1, &process_on_i_active[k], k, MPI_CHAR); //MPI_CXX_BOOL
                     }
@@ -216,14 +217,14 @@ int main(int argc, char** argv)
                 /// EC3
             }
             /// C4
-            general_offset_i=0;
+            general_offset_i = 0;
             general_offset_j += p;
 //            assert(general_offset_j < n);
             if (general_offset_j >= n)
             {
-                for (int k = 0; process_on_j_active[k]&& k < p; ++k)/// If last signal is needed
+                for (int k = 0; process_on_j_active[k] && k < p; ++k)/// If last signal is needed
                 {
-                    process_on_j_active[k]=false;
+                    process_on_j_active[k] = false;
                     if (k != q)
                         send(1, &process_on_j_active[k], k, MPI_CHAR); //MPI_CXX_BOOL
                 }
@@ -240,13 +241,15 @@ int main(int argc, char** argv)
                     send(1, &process_on_j_active[k], k, MPI_CHAR);
             }
             /// EC4
-            copy(process_on_j_active, process_on_j_active+p, process_on_i_active);
+            copy(process_on_j_active, process_on_j_active + p, process_on_i_active);
         }
     }
-    if(my_rank==q)
+    if (my_rank == q)
+    {
         View(D, n, n);
-    int B_D[]={180, 200, 220, 240, 404, 456, 508, 560, 628, 712, 796, 880,852, 968, 1084, 1200};
-    assert(std::equal(D, D+n*n, B_D));
+        int B_D[] = {180, 200, 220, 240, 404, 456, 508, 560, 628, 712, 796, 880, 852, 968, 1084, 1200};
+        assert(std::equal(D, D + n * n, B_D));
+    }
 //    array<int, n*n> B_D={1, 2 ,3};
 
     computatuions_off:
@@ -395,17 +398,21 @@ string to_str(const MPI_Datatype& type)
             return "None";
     }
 }
+
 void receive(const int n, void* data, const MPI_Datatype type, const int root)
-{ cout << "trying receive " << n << ' ' << to_str((MPI_Datatype) type);
-    if(root!=q)
-        cout<<" from "<<root;
-    cout<<endl;
+{
+    cout << "trying receive " << n << ' ' << to_str((MPI_Datatype) type);
+    if (root != q)
+        cout << " from " << root;
+    cout << endl;
     MPI_Recv(data, n, type, root, 0, MPI_COMM_WORLD, &status);
 }
 
 void send(const int n, const void* data, int process, const MPI_Datatype type)
-{cout << "trying send " << n << " to process " << process << " with type " << to_str(type) << endl;
-    MPI_Send(data, n, type, process, 0, MPI_COMM_WORLD); }
+{
+    cout << "trying send " << n << " to process " << process << " with type " << to_str(type) << endl;
+    MPI_Send(data, n, type, process, 0, MPI_COMM_WORLD);
+}
 
 template<typename T>
 void View(T* pMatrix, size_t n_row, const size_t n_col) noexcept
