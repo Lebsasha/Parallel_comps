@@ -3,17 +3,17 @@
 #include <cassert>
 #include <iomanip>
 
-#include </usr/include/x86_64-linux-gnu/mpich/mpi.h>
-#include "/home/alexander/Projects/Num_methods/Lib/Matrix.h"
+#include </usr/include/x86_64-linux-gnu/mpich/mpi.h> //TODO
 using namespace std;
 
 /**
  * @result Prints pMatrix in matrix n_row × n_col form numbers.
  */
 template<typename T>
-void View(T* pMatrix, size_t n_row, size_t n_col) noexcept;//TODO
+void View(T* pMatrix, size_t n_row, size_t n_col);
 
 MPI_Status status;
+
 ///root process
 int q;
 
@@ -29,18 +29,14 @@ int main(int argc, char** argv)
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    const int n = 1000;
+    const int n = 2000;
     q = 0;
     assert(q < p);
-    int* A;
-    int* B;
-    int* C;
-    int* D;
+    int* A, *B, *C, *D, *buffer;
     int* A_row = new int[n];
     int* B_col = new int[n];
     int* C_col = new int[n];
-    int d = 0;
-    int* buffer;
+    int result = 0;
     bool signal_i = true;
     bool signal_j = true;
     bool* process_on_j_active;
@@ -68,53 +64,37 @@ int main(int argc, char** argv)
         }
         general_offset_i = 0;
         general_offset_j = 0;
-    computation_time=MPI_Wtime();
+        computation_time=MPI_Wtime();
     }
 
     if (my_rank != q)
     {
         while (signal_j)//if (have work)
         {
-            /// C1
             receive(n, B_col);
             receive(n, C_col);
-            // View(B_col, 1, n);
-            // View(C_col, 1, n);
-            /// EC1
             while (signal_i)
             {
-                /// C2
                 receive(n, A_row);
-                // View(A_row, 1, n);
-                d = 0;
+                result = 0;
                 for (int k = 0; k < n; ++k)
                 {
-                    d += A_row[k] * (B_col[k] + C_col[k]);
+                    result += A_row[k] * (B_col[k] + C_col[k]);
                 }
-                //cout << my_rank << " = " << d << endl;
-                send(1, &d, q);
-                /// EC2
-                /// C3
+                send(1, &result, q);
                 receive(1, &signal_i, MPI_CXX_BOOL);
-                /// EC3
             }
             signal_i=true;
-            ///C4
             receive(1, &signal_j, MPI_CXX_BOOL);
-            /// EC4
         }
 
         /// Work is done
         cout<<my_rank<<" is off"<<endl;
-                MPI_Finalize();
-        return 0;
     }
     else // I am q
     {
         while (true)
         {
-            /// C1
-            //cout << "C1 in q" << endl;
             if(general_offset_j%100 == 0)
             cout<<general_offset_j<<endl;
             for (int k = 0; k < p && process_on_j_active[k]; ++k)/// B_Col
@@ -122,7 +102,7 @@ int main(int argc, char** argv)
                 for (int m = 0; m < n; ++m)
                     buffer[m] = B[m * n + general_offset_j + k];
                 if (k != q)
-                    send(n, buffer, k);
+                    MPI_Send(buffer, n, MPI_INT, k, 0, MPI_COMM_WORLD);
                 else
                     MPI_Sendrecv(buffer, n, MPI_INT, k, 0, B_col, n, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
             }
@@ -135,11 +115,8 @@ int main(int argc, char** argv)
                 else
                     MPI_Sendrecv(buffer, n, MPI_INT, k, 0, C_col, n, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
             }
-            /// EC1
             while (true)
             {
-                /// C2
-                //cout << "C2 in q" << endl;
                 for (int k = 0; k < p && process_on_j_active[k]; ++k)/// A_row
                 {
                     if (k != q)
@@ -150,10 +127,10 @@ int main(int argc, char** argv)
                 }
                 if (process_on_j_active[q])
                 {
-                    d = 0;
+                    result = 0;
                     for (int k = 0; k < n; ++k)/// Compute
                     {
-                        d += A_row[k] * (B_col[k] + C_col[k]);
+                        result += A_row[k] * (B_col[k] + C_col[k]);
                     }
                 }
                 for (int k = 0; k < p && process_on_j_active[k]; ++k)
@@ -162,43 +139,39 @@ int main(int argc, char** argv)
                         receive(1, D + (general_offset_i) * n + general_offset_j+k, MPI_INT, k);
                     else
                     {
-                        MPI_Sendrecv(&d, 1, MPI_INT, k, 0, D + (general_offset_i) * n + general_offset_j+k, 1, MPI_INT, k, 0,
+                        MPI_Sendrecv(&result, 1, MPI_INT, k, 0, D + (general_offset_i) * n + general_offset_j+k, 1, MPI_INT, k, 0,
                                      MPI_COMM_WORLD,
                                      &status);
                     }
 
                 }
-                /// EC2
-                /// C3
                 general_offset_i += 1;
-                if (general_offset_i >= n)
+                if (general_offset_i >= n)/// If process is ended by i
                 {
-                    signal_j = false;
+                    bool temp = false;
                     for (int k = 0; k < p && process_on_j_active[k]; ++k)/// If last signal is needed
                     {
                         if (k != q)
-                            send(1, &signal_j, k, MPI_CXX_BOOL); //MPI_CXX_BOOL
+                            send(1, &temp, k, MPI_CXX_BOOL);
                     }
                     break;
                 }
                 else 
-                for (int k = 0; k < p && process_on_j_active[k]; ++k)/// If i is needed
+                for (int k = 0; k < p && process_on_j_active[k]; ++k)/// Continue
                 {
                     if (k != q)
                         send(1, &process_on_j_active[k], k, MPI_CXX_BOOL);
                 }
-                /// EC3
             }
-            /// C4
             general_offset_i = 0;
             general_offset_j += p;
-            if (general_offset_j >= n)
+            if (general_offset_j >= n) /// If work done
             {
                 for (int k = 0; k < p && process_on_j_active[k]; ++k)/// If last signal is needed
                 {
                     process_on_j_active[k] = false;
                     if (k != q)
-                        send(1, &process_on_j_active[k], k, MPI_CXX_BOOL); //MPI_CXX_BOOL
+                        send(1, &process_on_j_active[k], k, MPI_CXX_BOOL);
                 }
                 break;
             }
@@ -209,77 +182,49 @@ int main(int argc, char** argv)
                 if (k != q)
                     send(1, &process_on_j_active[k], k, MPI_CXX_BOOL);
             }
-            /// EC4
-            //copy(process_on_j_active, process_on_j_active + p, process_on_i_active);
         }
 
-        /// Work is done
+        /// Work is done in root process
         computation_time=MPI_Wtime()-computation_time;
         // View(D, n, n);
-        cerr<<"time: "<<computation_time<<endl;
+        cout<<"time: "<<computation_time<<endl;
         delete[] buffer;
         delete[] process_on_j_active;
-        Matrix<int>M_A(A, n, n);
-        Matrix<int>M_B(B, n, n);
-        Matrix<int>M_C(C, n, n);
-        computation_time=MPI_Wtime();
-        Matrix<int>M_D=M_A*(M_B+M_C);
-        computation_time=MPI_Wtime()-computation_time;
-        cerr<<"time 2: "<<computation_time<<endl;
-        assert(std::equal(D, D + n * n, M_D.data()));
         delete[] A;
         delete[] B;
         delete[] C;
         delete[] D;
     }
 
+        delete[] A_row;
         delete[] B_col;
         delete[] C_col;
-        delete[] A_row;
         MPI_Finalize();
         return 0;
 }
 
-string to_str(const MPI_Datatype& type)
-{
-    switch (type)
-    {
-        case MPI_INT:
-            return "int";
-        case MPI_CXX_BOOL:
-            return "bool";
-        default:
-            return "None";
-    }
-}
-
 void receive(const int n, void* data, const MPI_Datatype type, const int root)
 {
-    // cout << "trying receive " << n << ' ' << to_str((MPI_Datatype) type)<<'s';
-    // if (root != q)
-    //     cout << " from " << root;
-    // cout << endl;
     MPI_Recv(data, n, type, root, 0, MPI_COMM_WORLD, &status);
 }
 
 void send(const int n, const void* data, int process, const MPI_Datatype type)
 {
-    // cout << "trying send " << n  << ' '<<to_str(type) << "s to process " << process << endl;
     MPI_Send(data, n, type, process, 0, MPI_COMM_WORLD);
 }
 
-// template<typename T>
-// void View(T* pMatrix, size_t n_row, const size_t n_col)
-// {
-//     while (n_row--)
-//     {
-//         for (size_t j = 0; j < n_col - 1; ++j)
-//         {
-//             std::cout << std::setw(3) << (*pMatrix) << " ";
-//             pMatrix++;
-//         }
-//         std::cout << std::setw(3) << *pMatrix++;
-//         std::cout << std::endl;
-//     }
-//     std::cout << std::endl;
-// }
+template<typename T>
+void View(T* pMatrix, size_t n_row, const size_t n_col)
+{
+    while (n_row--)
+    {
+        for (size_t j = 0; j < n_col - 1; ++j)
+        {
+            std::cout << std::setw(3) << (*pMatrix) << " ";
+            pMatrix++;
+        }
+        std::cout << std::setw(3) << *pMatrix++;
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+}
