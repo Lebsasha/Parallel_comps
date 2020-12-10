@@ -29,7 +29,7 @@ int main(int argc, char** argv)
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    const int n = 2000;
+    const int n = 1257;
     q = 0;
     assert(q < p);
     int* A, *B, *C, *D, *buffer;
@@ -39,7 +39,7 @@ int main(int argc, char** argv)
     int result = 0;
     bool signal_i = true;
     bool signal_j = true;
-    bool* process_on_j_active;
+    int last_active_process;
     int general_offset_i;
     int general_offset_j;
     double computation_time;
@@ -57,11 +57,7 @@ int main(int argc, char** argv)
             D[i] = 0;
         }
         buffer = new int[n];
-        process_on_j_active = new bool[p];
-        for (int k = 0; k < p; ++k)
-        {
-            process_on_j_active[k] = true;
-        }
+        last_active_process=p-1;
         general_offset_i = 0;
         general_offset_j = 0;
         computation_time=MPI_Wtime();
@@ -89,7 +85,6 @@ int main(int argc, char** argv)
         }
 
         /// Work is done
-        cout<<my_rank<<" is off"<<endl;
     }
     else // I am q
     {
@@ -97,7 +92,7 @@ int main(int argc, char** argv)
         {
             if(general_offset_j%100 == 0)
             cout<<general_offset_j<<endl;
-            for (int k = 0; k < p && process_on_j_active[k]; ++k)/// B_Col
+            for (int k = 0; k <= last_active_process; ++k)/// B_Col
             {
                 for (int m = 0; m < n; ++m)
                     buffer[m] = B[m * n + general_offset_j + k];
@@ -106,7 +101,7 @@ int main(int argc, char** argv)
                 else
                     MPI_Sendrecv(buffer, n, MPI_INT, k, 0, B_col, n, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
             }
-            for (int k = 0; k < p && process_on_j_active[k]; ++k)/// C_Col
+            for (int k = 0; k <= last_active_process; ++k)/// C_Col
             {
                 for (int m = 0; m < n; ++m)
                     buffer[m] = C[m * n + general_offset_j + k];
@@ -117,7 +112,7 @@ int main(int argc, char** argv)
             }
             while (true)
             {
-                for (int k = 0; k < p && process_on_j_active[k]; ++k)/// A_row
+                for (int k = 0; k <= last_active_process; ++k)/// A_row
                 {
                     if (k != q)
                         MPI_Send(A + (general_offset_i) * n, n, MPI_INT, k, 0, MPI_COMM_WORLD);
@@ -125,7 +120,7 @@ int main(int argc, char** argv)
                         MPI_Sendrecv(A + (general_offset_i) * n, n, MPI_INT, k, 0, A_row, n, MPI_INT, k, 0, MPI_COMM_WORLD,
                                      &status);
                 }
-                if (process_on_j_active[q])
+                if (q <= last_active_process)
                 {
                     result = 0;
                     for (int k = 0; k < n; ++k)/// Compute
@@ -133,7 +128,7 @@ int main(int argc, char** argv)
                         result += A_row[k] * (B_col[k] + C_col[k]);
                     }
                 }
-                for (int k = 0; k < p && process_on_j_active[k]; ++k)
+                for (int k = 0; k <= last_active_process; ++k)
                 {
                     if (k != q)
                         receive(1, D + (general_offset_i) * n + general_offset_j+k, MPI_INT, k);
@@ -148,48 +143,47 @@ int main(int argc, char** argv)
                 general_offset_i += 1;
                 if (general_offset_i >= n)/// If process is ended by i
                 {
-                    bool temp = false;
-                    for (int k = 0; k < p && process_on_j_active[k]; ++k)/// If last signal is needed
+                    signal_i = false;
+                    for (int k = 0; k <= last_active_process; ++k)/// If last signal is needed
                     {
                         if (k != q)
-                            send(1, &temp, k, MPI_CXX_BOOL);
+                            send(1, &signal_i, k, MPI_CXX_BOOL);
                     }
                     break;
                 }
-                else 
-                for (int k = 0; k < p && process_on_j_active[k]; ++k)/// Continue
+                signal_i=true;
+                for (int k = 0; k <= last_active_process; ++k)/// Continue
                 {
                     if (k != q)
-                        send(1, &process_on_j_active[k], k, MPI_CXX_BOOL);
+                        send(1, &signal_i, k, MPI_CXX_BOOL);
                 }
             }
             general_offset_i = 0;
             general_offset_j += p;
             if (general_offset_j >= n) /// If work done
             {
-                for (int k = 0; k < p && process_on_j_active[k]; ++k)/// If last signal is needed
+                signal_j=false;
+                for (int k = 0; k <= last_active_process; ++k)/// If last signal is needed
                 {
-                    process_on_j_active[k] = false;
                     if (k != q)
-                        send(1, &process_on_j_active[k], k, MPI_CXX_BOOL);
+                        send(1, &signal_j, k, MPI_CXX_BOOL);
                 }
                 break;
             }
+            last_active_process = n - general_offset_j > p ? p-1 : n - general_offset_j-1;
             for (int k = 0; k < p; ++k)/// If j is needed
             {
-                    process_on_j_active[k] = (n - general_offset_j - k > 0) ? true : false;
-
+                signal_j= k<=last_active_process;
                 if (k != q)
-                    send(1, &process_on_j_active[k], k, MPI_CXX_BOOL);
+                    send(1, &signal_j, k, MPI_CXX_BOOL);
             }
         }
 
         /// Work is done in root process
         computation_time=MPI_Wtime()-computation_time;
         // View(D, n, n);
-        cout<<"time: "<<computation_time<<endl;
+        cout<<"Work is off in time: "<<computation_time<<endl;
         delete[] buffer;
-        delete[] process_on_j_active;
         delete[] A;
         delete[] B;
         delete[] C;
