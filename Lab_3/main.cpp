@@ -52,7 +52,7 @@ int main(int argc, char** argv)
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    const int n = 5000;
+    const int n = 1000;
     q = 0;
     assert(q < p);
     int* A;
@@ -132,10 +132,15 @@ int main(int argc, char** argv)
             receive(1, &signal_j, MPI_CHAR);
             /// EC4
         }
-        //cout<<my_rank<<" is off"<<endl;
         //else
         // goto computatuions_off;
+        cout<<my_rank<<" is off"<<endl;
+        delete[] B_col;
+        delete[] C_col;
+        delete[] A_row;
         // goto begg;
+        // MPI_Finalize();
+        // return 0;
     }
     else // I am q
     {
@@ -170,7 +175,7 @@ int main(int argc, char** argv)
             {
                 /// C2
                 //cout << "C2 in q" << endl;
-                for (int k = 0; process_on_i_active[k] && k < p; ++k)/// A_row
+                for (int k = 0; process_on_j_active[k] && k < p; ++k)/// A_row
                 {
                     if (k != q)
                         MPI_Send(A + (general_offset_i) * n, n, MPI_INT, k, 0, MPI_COMM_WORLD);
@@ -178,7 +183,7 @@ int main(int argc, char** argv)
                         MPI_Sendrecv(A + (general_offset_i) * n, n, MPI_INT, k, 0, A_row, n, MPI_INT, k, 0, MPI_COMM_WORLD,
                                      &status);
                 }
-                if (process_on_i_active[q])
+                if (process_on_j_active[q])
                 {
                     d = 0;
                     for (int k = 0; k < n; ++k)/// Compute
@@ -186,7 +191,7 @@ int main(int argc, char** argv)
                         d += A_row[k] * (B_col[k] + C_col[k]);
                     }
                 }
-                for (int k = 0; process_on_i_active[k] && k < p; ++k)
+                for (int k = 0; process_on_j_active[k] && k < p; ++k)
                 {
                     if (k != q)
                         receive(1, D + (general_offset_i) * n + general_offset_j+k, MPI_INT, k);
@@ -198,42 +203,30 @@ int main(int argc, char** argv)
                     }
 
                 }
-                //MPI_Gather(&d, 1, MPI_INT, buffer, p, 1, q, MPI_COMM_WORLD);
-//            for (int k = 0; k < p; ++k)// Gather
-//            {
-//                D[general_offset_i + k] = buffer[k];
-//            }
                 /// EC2
                 /// C3
                 general_offset_i += 1;
-//            assert(general_offset_i < n);
                 if (general_offset_i >= n)
                 {
-                    for (int k = 0; process_on_i_active[k] && k < p; ++k)/// If last signal is needed
+                    signal_j = false;
+                    for (int k = 0; process_on_j_active[k] && k < p; ++k)/// If last signal is needed
                     {
-                        process_on_i_active[k] = false;
                         if (k != q)
-                            send(1, &process_on_i_active[k], k, MPI_CHAR); //MPI_CXX_BOOL
+                            send(1, &signal_j, k, MPI_CHAR); //MPI_CXX_BOOL
                     }
                     break;
                 }
                 else 
-                for (int k = 0; k < p; ++k)/// If i is needed
+                for (int k = 0; process_on_j_active[k] && k < p; ++k)/// If i is needed
                 {
-                    if (process_on_j_active[k] && n - general_offset_i > 0)
-                        process_on_i_active[k] = true;
-                    else
-                        process_on_i_active[k] = false;
-
                     if (k != q)
-                        send(1, &process_on_i_active[k], k, MPI_CHAR);
+                        send(1, &process_on_j_active[k], k, MPI_CHAR);
                 }
                 /// EC3
             }
             /// C4
             general_offset_i = 0;
             general_offset_j += p;
-//            assert(general_offset_j < n);
             if (general_offset_j >= n)
             {
                 for (int k = 0; process_on_j_active[k] && k < p; ++k)/// If last signal is needed
@@ -255,7 +248,7 @@ int main(int argc, char** argv)
                     send(1, &process_on_j_active[k], k, MPI_CHAR);
             }
             /// EC4
-            copy(process_on_j_active, process_on_j_active + p, process_on_i_active);
+            //copy(process_on_j_active, process_on_j_active + p, process_on_i_active);
         }
     }
 
@@ -264,6 +257,12 @@ int main(int argc, char** argv)
         computation_time=MPI_Wtime()-computation_time;
         // View(D, n, n);
         cerr<<"time: "<<computation_time<<endl;
+        // delete[] A;
+        // delete[] B;
+        // delete[] C;
+        // delete[] D;
+        delete[] buffer;
+        delete[] process_on_j_active;
         Matrix<int>M_A(A, n, n);
         Matrix<int>M_B(B, n, n);
         Matrix<int>M_C(C, n, n);
@@ -279,136 +278,7 @@ int main(int argc, char** argv)
     signal_i = true;
     if (signal_i)
         return 0;
-
-
-    general_offset_i = 0;
-    {
-        int i = 0;
-        int j = 0;
-        while (j < n)
-        {
-            if (my_rank == q)
-                for (int k = 0; k < p; ++k)
-                {
-                    for (int m = 0; m < n; ++m)
-                    {
-                        B_col[m] = B[m * n + j];
-                    }
-                    if (k != q)
-                        MPI_Send(B_col, n, MPI_INT, k, 0, MPI_COMM_WORLD);
-                    else//TODO Remove as unused?
-                        MPI_Sendrecv(B_col, n, MPI_INT, k, 0, B_col, n, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
-                }
-            MPI_Recv(B_col, n, MPI_INT, q, 0, MPI_COMM_WORLD, &status);
-            if (my_rank == q)
-                for (int k = 0; k < p; ++k)
-                {
-                    for (int m = 0; m < n; ++m)
-                    {
-                        C_col[m] = C[m * n + j];
-                    }
-                    if (k != q)
-                        MPI_Send(C_col, n, MPI_INT, k, 0, MPI_COMM_WORLD);
-                    else//TODO Remove as unused?
-                        MPI_Sendrecv(C_col, n, MPI_INT, k, 0, C_col, n, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
-                }
-            MPI_Recv(C_col, n, MPI_INT, q, 0, MPI_COMM_WORLD, &status);
-
-            while (i < n)
-            {
-                if (my_rank == q)
-                    for (int k = 0; k < p; ++k)
-                    {
-                        if (k != q)
-                            MPI_Send(A + k * n, n, MPI_INT, k, 0, MPI_COMM_WORLD);
-                        else
-                            MPI_Sendrecv(A + k * n, n, MPI_INT, k, 0, A_row, n, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
-                    }
-                MPI_Recv(A_row, n, MPI_INT, q, 0, MPI_COMM_WORLD, &status);
-                for (int k = 0; k < n; ++k)
-                {
-                    d += A_row[k] * (B_col[k] + C_col[k]);
-                }
-                MPI_Gather(&d, 1, MPI_INT, D + general_offset_i, p, 1, q, MPI_COMM_WORLD);
-                if (my_rank == q)
-                {
-                    general_offset_i += p;
-                    ++i;
-                }
-//            MPI_Scatter(B, n, MPI_INT, B_col, n, MPI_INT, q, MPI_COMM_WORLD);
-//            MPI_Scatter(B, n, MPI_INT, C_col, n, MPI_INT, q, MPI_COMM_WORLD);
-//            MPI_Scatter(B, n, MPI_INT, A_row, n, MPI_INT, q, MPI_COMM_WORLD);
-            }
-            ++j;
-        }
-        if (my_rank == q)
-        {
-            View(D, n, n);
-        }
-        MPI_Finalize();
-    }
-
 }
-
-//    const int m = 5;
-//    const int k = 2;
-//    const int q = 2;
-//    assert(k < n);
-//    assert(p <= m);
-//
-//    int my_rank;
-//    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-//    int* A = new int[n * m];
-//    int* B;
-//    int* recvbuf = new int[m];
-//    int* counts = new int[p];
-//    int* displs = new int[p];
-//    for (int* ptr = A; ptr < A + n * m; ++ptr)
-//    {
-//        *ptr = my_rank;
-//    }
-//    for (int i = 0; i < p; ++i)
-//    {
-//        counts[i] = m - i;
-//    }
-//    for (int i = 0; i < p; ++i)
-//    {
-//        displs[i] = i * m;
-//    }
-//    for (int i = 0; i < m; ++i)
-//    {
-//        recvbuf[i] = 0;
-//    }
-//    if (my_rank == q)
-//    {
-//        B = new int[p * m];
-//        for (int i = 0; i < p; ++i)
-//            for (int j = 0; j < m; ++j)
-//            {
-//                B[i * m + j] = i;
-//            }
-//        for (int i = 0; i < p; ++i)
-//        {
-//            if (i != q)
-//                MPI_Send(B + displs[i], counts[i], MPI_INT, i, 0, MPI_COMM_WORLD);
-//            else
-//                MPI_Sendrecv(B + displs[i], counts[i], MPI_INT, i, 0, recvbuf, counts[i], MPI_INT, i, 0, MPI_COMM_WORLD, &status);
-//        }
-//    }
-// //    View(A, n, m);
-//    //MPI_Scatterv(B, counts, displs, MPI_INT, recvbuf, counts[my_rank], MPI_INT, q, MPI_COMM_WORLD);
-//    if (my_rank != q)
-//        MPI_Recv(recvbuf, counts[my_rank], MPI_INT, q, 0, MPI_COMM_WORLD, &status);
-//    for (int* ptr = A; ptr < A + n * m; ++ptr)
-//        *ptr = 0;
-//    for (int* ptr = A + k * m; ptr < A + (k + 1) * m; ++ptr, ++recvbuf)
-//        *ptr = *recvbuf;
-//    char* temp = new char[2];
-//    if (my_rank != 0) // Следующий процесс будет выводить на экран только после прерыдущего
-//        MPI_Recv((void*) temp, 1, MPI_CHAR, my_rank - 1, 0, MPI_COMM_WORLD, &status);
-//    View(A, n, m);
-//    if (my_rank != p - 1)
-//        MPI_Send("1", 1, MPI_CHAR, my_rank + 1, 0, MPI_COMM_WORLD);
 
 string to_str(const MPI_Datatype& type)
 {
