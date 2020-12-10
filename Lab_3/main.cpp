@@ -152,7 +152,7 @@ int main(int argc, char** argv)
             //cout << "C1 in q" << endl;
             if(general_offset_j%100 == 0)
             cout<<general_offset_j<<endl;
-            for (int k = 0; process_on_j_active[k] && k < p; ++k)/// B_Col
+            for (int k = 0; k < p && process_on_j_active[k]; ++k)/// B_Col
             {
                 for (int m = 0; m < n; ++m)
                     buffer[m] = B[m * n + general_offset_j + k];
@@ -161,7 +161,7 @@ int main(int argc, char** argv)
                 else
                     MPI_Sendrecv(buffer, n, MPI_INT, k, 0, B_col, n, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
             }
-            for (int k = 0; process_on_j_active[k] && k < p; ++k)/// C_Col
+            for (int k = 0; k < p && process_on_j_active[k]; ++k)/// C_Col
             {
                 for (int m = 0; m < n; ++m)
                     buffer[m] = C[m * n + general_offset_j + k];
@@ -175,7 +175,7 @@ int main(int argc, char** argv)
             {
                 /// C2
                 //cout << "C2 in q" << endl;
-                for (int k = 0; process_on_j_active[k] && k < p; ++k)/// A_row
+                for (int k = 0; k < p && process_on_j_active[k]; ++k)/// A_row
                 {
                     if (k != q)
                         MPI_Send(A + (general_offset_i) * n, n, MPI_INT, k, 0, MPI_COMM_WORLD);
@@ -191,7 +191,7 @@ int main(int argc, char** argv)
                         d += A_row[k] * (B_col[k] + C_col[k]);
                     }
                 }
-                for (int k = 0; process_on_j_active[k] && k < p; ++k)
+                for (int k = 0; k < p && process_on_j_active[k]; ++k)
                 {
                     if (k != q)
                         receive(1, D + (general_offset_i) * n + general_offset_j+k, MPI_INT, k);
@@ -209,7 +209,7 @@ int main(int argc, char** argv)
                 if (general_offset_i >= n)
                 {
                     signal_j = false;
-                    for (int k = 0; process_on_j_active[k] && k < p; ++k)/// If last signal is needed
+                    for (int k = 0; k < p && process_on_j_active[k]; ++k)/// If last signal is needed
                     {
                         if (k != q)
                             send(1, &signal_j, k, MPI_CHAR); //MPI_CXX_BOOL
@@ -217,7 +217,7 @@ int main(int argc, char** argv)
                     break;
                 }
                 else 
-                for (int k = 0; process_on_j_active[k] && k < p; ++k)/// If i is needed
+                for (int k = 0; k < p && process_on_j_active[k]; ++k)/// If i is needed
                 {
                     if (k != q)
                         send(1, &process_on_j_active[k], k, MPI_CHAR);
@@ -229,7 +229,7 @@ int main(int argc, char** argv)
             general_offset_j += p;
             if (general_offset_j >= n)
             {
-                for (int k = 0; process_on_j_active[k] && k < p; ++k)/// If last signal is needed
+                for (int k = 0; k < p && process_on_j_active[k]; ++k)/// If last signal is needed
                 {
                     process_on_j_active[k] = false;
                     if (k != q)
