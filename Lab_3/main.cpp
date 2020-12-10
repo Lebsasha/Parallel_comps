@@ -52,7 +52,7 @@ int main(int argc, char** argv)
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    const int n = 4;
+    const int n = 5000;
     q = 0;
     assert(q < p);
     int* A;
@@ -97,7 +97,7 @@ int main(int argc, char** argv)
     computation_time=MPI_Wtime();
     }
 
-    begg:
+    // begg:
     if (my_rank != q)
     {
         //MPI_Recv(&signal_j, 1, MPI_CHAR, q, 0, MPI_COMM_WORLD, &status);
@@ -106,20 +106,20 @@ int main(int argc, char** argv)
             /// C1
             receive(n, B_col);
             receive(n, C_col);
-            View(B_col, 1, n);
-            View(C_col, 1, n);
+            // View(B_col, 1, n);
+            // View(C_col, 1, n);
             /// EC1
             while (signal_i)
             {
                 /// C2
                 receive(n, A_row);
-                View(A_row, 1, n);
+                // View(A_row, 1, n);
                 d = 0;
                 for (int k = 0; k < n; ++k)
                 {
                     d += A_row[k] * (B_col[k] + C_col[k]);
                 }
-                cout << my_rank << " = " << d << endl;
+                //cout << my_rank << " = " << d << endl;
                 send(1, &d, q);
                 //MPI_Gather(&d, 1, MPI_INT, buffer, p, 1, q, MPI_COMM_WORLD);
                 /// EC2
@@ -132,7 +132,7 @@ int main(int argc, char** argv)
             receive(1, &signal_j, MPI_CHAR);
             /// EC4
         }
-        cout<<my_rank<<" is off"<<endl;
+        //cout<<my_rank<<" is off"<<endl;
         //else
         // goto computatuions_off;
         // goto begg;
@@ -144,7 +144,9 @@ int main(int argc, char** argv)
 //            int i = 0;
 //            int j = 0;
             /// C1
-            cout << "C1 in q" << endl;
+            //cout << "C1 in q" << endl;
+            if(general_offset_j%100 == 0)
+            cout<<general_offset_j<<endl;
             for (int k = 0; process_on_j_active[k] && k < p; ++k)/// B_Col
             {
                 for (int m = 0; m < n; ++m)
@@ -167,7 +169,7 @@ int main(int argc, char** argv)
             while (true)// TODO
             {
                 /// C2
-                cout << "C2 in q" << endl;
+                //cout << "C2 in q" << endl;
                 for (int k = 0; process_on_i_active[k] && k < p; ++k)/// A_row
                 {
                     if (k != q)
@@ -260,7 +262,7 @@ int main(int argc, char** argv)
     if (my_rank == q)
     {
         computation_time=MPI_Wtime()-computation_time;
-        View(D, n, n);
+        // View(D, n, n);
         cerr<<"time: "<<computation_time<<endl;
         Matrix<int>M_A(A, n, n);
         Matrix<int>M_B(B, n, n);
@@ -272,7 +274,7 @@ int main(int argc, char** argv)
         assert(std::equal(D, D + n * n, M_D.data()));
     }
 
-    computatuions_off:
+    // computatuions_off:
     MPI_Finalize();
     signal_i = true;
     if (signal_i)
@@ -423,16 +425,16 @@ string to_str(const MPI_Datatype& type)
 
 void receive(const int n, void* data, const MPI_Datatype type, const int root)
 {
-    cout << "trying receive " << n << ' ' << to_str((MPI_Datatype) type)<<'s';
-    if (root != q)
-        cout << " from " << root;
-    cout << endl;
+    // cout << "trying receive " << n << ' ' << to_str((MPI_Datatype) type)<<'s';
+    // if (root != q)
+    //     cout << " from " << root;
+    // cout << endl;
     MPI_Recv(data, n, type, root, 0, MPI_COMM_WORLD, &status);
 }
 
 void send(const int n, const void* data, int process, const MPI_Datatype type)
 {
-    cout << "trying send " << n  << ' '<<to_str(type) << "s to process " << process << endl;
+    // cout << "trying send " << n  << ' '<<to_str(type) << "s to process " << process << endl;
     MPI_Send(data, n, type, process, 0, MPI_COMM_WORLD);
 }
 
