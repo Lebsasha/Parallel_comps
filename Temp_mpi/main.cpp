@@ -12,7 +12,7 @@
 #else // CBB
 
 #include </usr/include/x86_64-linux-gnu/mpich/mpi.h>
-#include <cmath>
+#include "/home/alexander/Projects/Num_methods/Lib/Matrix.h"
 ///usr/include/x86_64-linux-gnu/mpich/mpi.h
 #endif // CBB
 using namespace std;
@@ -46,7 +46,7 @@ int main(int argc, char** argv)
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-    const int n = 4;
+    const int n = 5;
     q = 0;
     assert(q < p);
     int* A;
@@ -247,10 +247,14 @@ int main(int argc, char** argv)
     if (my_rank == q)
     {
         View(D, n, n);
-        int B_D[] = {180, 200, 220, 240, 404, 456, 508, 560, 628, 712, 796, 880, 852, 968, 1084, 1200};
-        assert(std::equal(D, D + n * n, B_D));
+        Matrix<int>M_A(A, n, n);
+        Matrix<int>M_B(B, n, n);
+        Matrix<int>M_C(C, n, n);
+        Matrix<int>M_D=M_A*(M_B+M_C);
+        assert(std::equal(D, D + n * n, M_D.data()));
     }
 //    array<int, n*n> B_D={1, 2 ,3};
+
 
     computatuions_off:
     MPI_Finalize();
@@ -414,18 +418,18 @@ void send(const int n, const void* data, int process, const MPI_Datatype type)
     MPI_Send(data, n, type, process, 0, MPI_COMM_WORLD);
 }
 
-template<typename T>
-void View(T* pMatrix, size_t n_row, const size_t n_col) noexcept
-{
-    while (n_row--)
-    {
-        for (size_t j = 0; j < n_col - 1; ++j)
-        {
-            std::cout << std::setw(3) << (*pMatrix) << " ";
-            pMatrix++;
-        }
-        std::cout << std::setw(3) << *pMatrix++;
-        std::cout << std::endl;
-    }
-    std::cout << std::endl;
-}
+//template<typename T>
+//void View(T* pMatrix, size_t n_row, const size_t n_col) noexcept
+//{
+//    while (n_row--)
+//    {
+//        for (size_t j = 0; j < n_col - 1; ++j)
+//        {
+//            std::cout << std::setw(3) << (*pMatrix) << " ";
+//            pMatrix++;
+//        }
+//        std::cout << std::setw(3) << *pMatrix++;
+//        std::cout << std::endl;
+//    }
+//    std::cout << std::endl;
+//}

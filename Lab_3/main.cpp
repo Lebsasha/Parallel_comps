@@ -12,7 +12,7 @@
 #else // CBB
 
 #include </usr/include/x86_64-linux-gnu/mpich/mpi.h>
-#include <cmath>
+#include "/home/alexander/Projects/Num_methods/Lib/Matrix.h"
 ///usr/include/x86_64-linux-gnu/mpich/mpi.h
 #endif // CBB
 using namespace std;
@@ -30,6 +30,12 @@ int q;
 void send(int n, const void* data, int process, MPI_Datatype type = MPI_INT);
 
 void receive(int n, void* data, MPI_Datatype type = MPI_INT, int root = q);
+
+
+///  1	 2	 3	 4
+///  5	 6	 7	 8
+///  9	10	11	12
+/// 13	14	15	16
 
 
 /// 180	200	 220	 240
@@ -64,6 +70,7 @@ int main(int argc, char** argv)
     bool* process_on_j_active;
     int general_offset_i;
     int general_offset_j;
+    double computation_time;
     if (my_rank == q)
     {
         A = new int[n * n];
@@ -87,6 +94,7 @@ int main(int argc, char** argv)
         }
         general_offset_i = 0;
         general_offset_j = 0;
+    computation_time=MPI_Wtime();
     }
 
     begg:
@@ -105,6 +113,7 @@ int main(int argc, char** argv)
             {
                 /// C2
                 receive(n, A_row);
+                View(A_row, 1, n);
                 d = 0;
                 for (int k = 0; k < n; ++k)
                 {
@@ -118,10 +127,12 @@ int main(int argc, char** argv)
                 receive(1, &signal_i, MPI_CHAR);
                 /// EC3
             }
+            signal_i=true;
             ///C4
             receive(1, &signal_j, MPI_CHAR);
             /// EC4
         }
+        cout<<my_rank<<" is off"<<endl;
         //else
         // goto computatuions_off;
         // goto begg;
@@ -160,9 +171,9 @@ int main(int argc, char** argv)
                 for (int k = 0; process_on_i_active[k] && k < p; ++k)/// A_row
                 {
                     if (k != q)
-                        MPI_Send(A + (general_offset_i + k) * n, n, MPI_INT, k, 0, MPI_COMM_WORLD);
+                        MPI_Send(A + (general_offset_i) * n, n, MPI_INT, k, 0, MPI_COMM_WORLD);
                     else
-                        MPI_Sendrecv(A + (general_offset_i + k) * n, n, MPI_INT, k, 0, A_row, n, MPI_INT, k, 0, MPI_COMM_WORLD,
+                        MPI_Sendrecv(A + (general_offset_i) * n, n, MPI_INT, k, 0, A_row, n, MPI_INT, k, 0, MPI_COMM_WORLD,
                                      &status);
                 }
                 if (process_on_i_active[q])
@@ -176,10 +187,10 @@ int main(int argc, char** argv)
                 for (int k = 0; process_on_i_active[k] && k < p; ++k)
                 {
                     if (k != q)
-                        receive(1, D + (general_offset_i + k) * n + general_offset_j, MPI_INT, k);
+                        receive(1, D + (general_offset_i) * n + general_offset_j+k, MPI_INT, k);
                     else
                     {
-                        MPI_Sendrecv(&d, 1, MPI_INT, k, 0, D + (general_offset_i + k) * n + general_offset_j, 1, MPI_INT, k, 0,
+                        MPI_Sendrecv(&d, 1, MPI_INT, k, 0, D + (general_offset_i) * n + general_offset_j+k, 1, MPI_INT, k, 0,
                                      MPI_COMM_WORLD,
                                      &status);
                     }
@@ -192,7 +203,7 @@ int main(int argc, char** argv)
 //            }
                 /// EC2
                 /// C3
-                general_offset_i += p;
+                general_offset_i += 1;
 //            assert(general_offset_i < n);
                 if (general_offset_i >= n)
                 {
@@ -204,9 +215,10 @@ int main(int argc, char** argv)
                     }
                     break;
                 }
+                else 
                 for (int k = 0; k < p; ++k)/// If i is needed
                 {
-                    if (process_on_j_active[k] && n - general_offset_i - k > 0)
+                    if (process_on_j_active[k] && n - general_offset_i > 0)
                         process_on_i_active[k] = true;
                     else
                         process_on_i_active[k] = false;
@@ -247,9 +259,17 @@ int main(int argc, char** argv)
 
     if (my_rank == q)
     {
+        computation_time=MPI_Wtime()-computation_time;
         View(D, n, n);
-        int B_D[] = {180, 200, 220, 240, 404, 456, 508, 560, 628, 712, 796, 880, 852, 968, 1084, 1200};
-        assert(std::equal(D, D + n * n, B_D));
+        cerr<<"time: "<<computation_time<<endl;
+        Matrix<int>M_A(A, n, n);
+        Matrix<int>M_B(B, n, n);
+        Matrix<int>M_C(C, n, n);
+        computation_time=MPI_Wtime();
+        Matrix<int>M_D=M_A*(M_B+M_C);
+        computation_time=MPI_Wtime()-computation_time;
+        cerr<<"time 2: "<<computation_time<<endl;
+        assert(std::equal(D, D + n * n, M_D.data()));
     }
 
     computatuions_off:
@@ -320,7 +340,9 @@ int main(int argc, char** argv)
             ++j;
         }
         if (my_rank == q)
+        {
             View(D, n, n);
+        }
         MPI_Finalize();
     }
 
@@ -401,7 +423,7 @@ string to_str(const MPI_Datatype& type)
 
 void receive(const int n, void* data, const MPI_Datatype type, const int root)
 {
-    cout << "trying receive " << n << ' ' << to_str((MPI_Datatype) type);
+    cout << "trying receive " << n << ' ' << to_str((MPI_Datatype) type)<<'s';
     if (root != q)
         cout << " from " << root;
     cout << endl;
@@ -410,22 +432,22 @@ void receive(const int n, void* data, const MPI_Datatype type, const int root)
 
 void send(const int n, const void* data, int process, const MPI_Datatype type)
 {
-    cout << "trying send " << n << " to process " << process << " with type " << to_str(type) << endl;
+    cout << "trying send " << n  << ' '<<to_str(type) << "s to process " << process << endl;
     MPI_Send(data, n, type, process, 0, MPI_COMM_WORLD);
 }
 
-template<typename T>
-void View(T* pMatrix, size_t n_row, const size_t n_col) noexcept
-{
-    while (n_row--)
-    {
-        for (size_t j = 0; j < n_col - 1; ++j)
-        {
-            std::cout << std::setw(3) << (*pMatrix) << " ";
-            pMatrix++;
-        }
-        std::cout << std::setw(3) << *pMatrix++;
-        std::cout << std::endl;
-    }
-    std::cout << std::endl;
-}
+// template<typename T>
+// void View(T* pMatrix, size_t n_row, const size_t n_col) noexcept
+// {
+//     while (n_row--)
+//     {
+//         for (size_t j = 0; j < n_col - 1; ++j)
+//         {
+//             std::cout << std::setw(3) << (*pMatrix) << " ";
+//             pMatrix++;
+//         }
+//         std::cout << std::setw(3) << *pMatrix++;
+//         std::cout << std::endl;
+//     }
+//     std::cout << std::endl;
+// }
