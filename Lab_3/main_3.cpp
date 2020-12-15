@@ -3,7 +3,7 @@
 #include <cassert>
 #include <iomanip>
 
-#include </usr/include/x86_64-linux-gnu/mpich/mpi.h> //TODO
+#include <mpich/mpi.h>
 using namespace std;
 
 /**
@@ -112,8 +112,8 @@ int main(int argc, char** argv)
                     if (k != q)
                         MPI_Send(A + (general_offset_i) * n, n, MPI_INT, k, 0, MPI_COMM_WORLD);
                     else
-                        MPI_Sendrecv(A + (general_offset_i) * n, n, MPI_INT, k, 0, A_row, n, MPI_INT, k, 0, MPI_COMM_WORLD,
-                                     &status);
+                        MPI_Sendrecv(A + (general_offset_i) * n, n, MPI_INT,k, 0,
+                                        A_row, n, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
                 }
                 if (q <= last_active_process)
                 {
@@ -138,7 +138,7 @@ int main(int argc, char** argv)
 
                 }
                 ++general_offset_i;
-                if (general_offset_i >= n)/// If process is ended
+                if (general_offset_i >= n)/// If rows end
                 {
                     signal_i = false;
                     for (int k = 0; k <= last_active_process; ++k)/// If last signal is needed
@@ -174,7 +174,7 @@ int main(int argc, char** argv)
                 break;
             }
             last_active_process = n - general_offset_j > p ? p-1 : n - general_offset_j-1;
-            for (int k = 0; k < p; ++k)/// If j is needed
+            for (int k = 0; k < p; ++k)/// If process is needed
             {
                 signal_j= k<=last_active_process;
                 if (k != q)
@@ -187,7 +187,7 @@ int main(int argc, char** argv)
         /// Work is done in root process
         computation_time=MPI_Wtime()-computation_time;
         // View(D, n, n);
-        cout<<"Work is off in time: "<<computation_time<<endl;
+        cout<<"Work is done in time: "<<computation_time<<endl;
         delete[] buffer;
         delete[] A;
         delete[] B;

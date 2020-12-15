@@ -10,7 +10,7 @@ using namespace std;
  * @result Prints pMatrix in matrix n_row × n_col form numbers.
  */
 template<typename T>
-void View(T* pMatrix, size_t n_row, size_t n_col) noexcept;
+void View(T* pMatrix, size_t n_row, size_t n_col);
 
 int main(int argc, char** argv)
 {
@@ -73,7 +73,7 @@ int main(int argc, char** argv)
 }
 
 template<typename T>
-void View(T* pMatrix, size_t n_row, const size_t n_col) noexcept
+void View(T* pMatrix, size_t n_row, const size_t n_col)
 {
     while (n_row--)
     {

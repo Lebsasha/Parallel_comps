@@ -2,15 +2,15 @@
 #include <cstring>
 #include <cassert>
 #include <iomanip>
-#include <mpich/mpi.h>
 
+#include <mpich/mpi.h>
 using namespace std;
 
 /**
  * @result Prints pMatrix in matrix n_row × n_col form numbers.
  */
 template<typename T>
-void View(T* pMatrix, size_t n_row, size_t n_col) noexcept;
+void View(T* pMatrix, size_t n_row, size_t n_col);
 
 int main(int argc, char** argv)
 {
@@ -21,7 +21,7 @@ int main(int argc, char** argv)
     const int n = 4;
     const int m = 5;
     const int k = 2;
-    const int q = 2;
+    const int q = 1;
     assert(k < n);
     assert(p <= m);
     assert(q < p);
@@ -32,6 +32,13 @@ int main(int argc, char** argv)
     int* recvbuf = new int[m];
     int* counts = new int[p];
     int* displs = new int[p];
+    if (my_rank == q)
+    {
+        B = new int[p * m];
+        for (int i = 0; i < p; ++i)
+            for (int j = 0; j < m; ++j)
+                B[i * m + j] = i;
+    }
     for (int* ptr = A; ptr < A + n * m; ++ptr)
         *ptr = my_rank;
     for (int i = 0; i < p; ++i)
@@ -41,24 +48,9 @@ int main(int argc, char** argv)
     }
     for (int i = 0; i < m; ++i)
         recvbuf[i] = 0;
-    if (my_rank == q)
-    {
-        B = new int[p * m];
-        for (int i = 0; i < p; ++i)
-            for (int j = 0; j < m; ++j)
-                B[i * m + j] = i;
-        for (int i = 0; i < p; ++i)
-        {
-            if (i != q)
-                MPI_Send(B + displs[i], counts[i], MPI_INT, i, 0, MPI_COMM_WORLD);
-            else
-                MPI_Sendrecv(B + displs[i], counts[i], MPI_INT, i, 0, recvbuf, counts[i], MPI_INT, i, 0, MPI_COMM_WORLD, &status);
-        }
-    }
 //    View(A, n, m);
-    //MPI_Scatterv(B, counts, displs, MPI_INT, recvbuf, counts[my_rank], MPI_INT, q, MPI_COMM_WORLD);
-    if (my_rank != q)
-        MPI_Recv(recvbuf, counts[my_rank], MPI_INT, q, 0, MPI_COMM_WORLD, &status);
+    MPI_Scatterv(B, counts, displs, MPI_INT, recvbuf, counts[my_rank], MPI_INT, q, MPI_COMM_WORLD);
+
     for (int* ptr = A; ptr < A + n * m; ++ptr)
         *ptr = 0;
     for (int* ptr = A + k * m; ptr < A + (k + 1) * m; ++ptr, ++recvbuf)
@@ -73,7 +65,7 @@ int main(int argc, char** argv)
 }
 
 template<typename T>
-void View(T* pMatrix, size_t n_row, const size_t n_col) noexcept
+void View(T* pMatrix, size_t n_row, const size_t n_col)
 {
     while (n_row--)
     {
