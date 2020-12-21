@@ -49,16 +49,30 @@ int main(int argc, char** argv)
     computation_time = omp_get_wtime();
 // TODO parallel by j
 
-#pragma omp parallel default(none) shared(A, B, C, D, cout)
+#pragma omp parallel sections default(none) shared(A, B, C, D, cout)
     {
-        size_t proc_id = omp_get_thread_num();
-        size_t num_of_threads = omp_get_num_threads();
-        for (size_t i = proc_id; i < n; i += num_of_threads)
-            for (size_t j = 0; j < n; ++j)
-                for (size_t k = 0; k < n; ++k)
-                {
-                    D[i * n + j] += A[i * n + k] * (B[k * n + j] + C[k * n + j]);
-                }
+#pragma omp section
+        {
+            for (size_t i = 0; i < n/2; ++i)
+            {
+                for (size_t j = 0; j < n; ++j)
+                    for (size_t k = 0; k < n; ++k)
+                    {
+                        D[i * n + j] += A[i * n + k] * (B[k * n + j] + C[k * n + j]);
+                    }
+            }
+        }
+#pragma omp section
+        {
+            for (size_t i = n/2; i < n; ++i)
+            {
+                for (size_t j = 0; j < n; ++j)
+                    for (size_t k = 0; k < n; ++k)
+                    {
+                        D[i * n + j] += A[i * n + k] * (B[k * n + j] + C[k * n + j]);
+                    }
+            }
+        }
     }
 
     computation_time = omp_get_wtime() - computation_time;
