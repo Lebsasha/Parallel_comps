@@ -3,7 +3,6 @@
 #include <cassert>
 #include <iomanip>
 
-//#include <mpich/mpi.h>
 #include <omp.h>
 
 using namespace std;
@@ -20,12 +19,8 @@ int q;
 
 int main(int argc, char** argv)
 {
-//    MPI_Init(&argc, &argv);
-//    status = MPI_Status();
     int p=1;
-//    MPI_Comm_size(MPI_COMM_WORLD, &p);
     int my_rank;
-//    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     const size_t n = 4;
     q = 0;
     assert(q < p);
@@ -41,27 +36,7 @@ int main(int argc, char** argv)
     size_t general_offset_j;
     double computation_time;
 
-//        while (signal_j)//if (have work)
-//        {
-//            MPI_Recv(B_col, n, MPI_INT, q, 0, MPI_COMM_WORLD, &status);
-//            MPI_Recv(C_col, n, MPI_INT, q, 0, MPI_COMM_WORLD, &status);
-//            while (signal_i)
-//            {
-//                MPI_Recv(A_row, n, MPI_INT, q, 0, MPI_COMM_WORLD, &status);
-//                result = 0;
-//                for (size_t k = 0; k < n; ++k)
-//                {
-//                    result += A_row[k] * (B_col[k] + C_col[k]);
-//                }
-//                MPI_Send(&result, 1, MPI_INT, q, 0, MPI_COMM_WORLD);
-//                MPI_Recv(&signal_i, 1, MPI_CXX_BOOL, q, 0, MPI_COMM_WORLD, &status);
-//            }
-//            signal_i=true;
-//            MPI_Recv(&signal_j, 1, MPI_CXX_BOOL, q, 0, MPI_COMM_WORLD, &status);
-//        }
-//    /// Work is done
-
-    omp_set_num_threads(2);
+    omp_set_num_threads(4);
     A = new int[n * n];
     B = new int[n * n];
     C = new int[n * n];
@@ -82,7 +57,7 @@ int main(int argc, char** argv)
 
 #pragma omp parallel default(none) shared(A, B, C, D)
     {
-#pragma omp for
+#pragma omp for schedule(static, 3)
         for (size_t i = 0; i < n; ++i)
             for (size_t j = 0; j < n; ++j)
                 for (size_t k = 0; k < n; ++k)
@@ -99,117 +74,16 @@ int main(int argc, char** argv)
     delete[] C;
     delete[] D;
 
-    /*while (true)
-    {
-        if(general_offset_j%100 == 0)
-            cout<<general_offset_j<<endl;
-        for (int k = 0; k <= last_active_process; ++k)/// B_Col
-        {
-            for (size_t m = 0; m < n; ++m)
-                buffer[m] = B[m * n + general_offset_j + k];
-            if (k != q)
-                MPI_Send(buffer, n, MPI_INT, k, 0, MPI_COMM_WORLD);
-            else
-                MPI_Sendrecv(buffer, n, MPI_INT, k, 0, B_col, n, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
-        }
-        for (int k = 0; k <= last_active_process; ++k)/// C_Col
-        {
-            for (size_t m = 0; m < n; ++m)
-                buffer[m] = C[m * n + general_offset_j + k];
-            if (k != q)
-                MPI_Send(buffer, n, MPI_INT, k, 0, MPI_COMM_WORLD);
-            else
-                MPI_Sendrecv(buffer, n, MPI_INT, k, 0, C_col, n, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
-        }
-        while (true)
-        {
-            for (int k = 0; k <= last_active_process; ++k)/// A_row
-            {
-                if (k != q)
-                    MPI_Send(A + (general_offset_i) * n, n, MPI_INT, k, 0, MPI_COMM_WORLD);
-                else
-                    MPI_Sendrecv(A + (general_offset_i) * n, n, MPI_INT,k, 0,
-                                    A_row, n, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
-            }
-            if (q <= last_active_process)
-            {
-                result = 0;
-                for (size_t k = 0; k < n; ++k)/// Compute
-                {
-                    result += A_row[k] * (B_col[k] + C_col[k]);
-                }
-            }
-            for (int k = 0; k <= last_active_process; ++k)
-            {
-                if (k != q)
-                {
-                    MPI_Recv(D + (general_offset_i) * n + general_offset_j + k, 1, MPI_INT, k, 0, MPI_COMM_WORLD, &status);
-                }
-                else
-                {
-                    MPI_Sendrecv(&result, 1, MPI_INT, k, 0, D + (general_offset_i) * n + general_offset_j+k, 1, MPI_INT, k, 0,
-                                 MPI_COMM_WORLD,
-                                 &status);
-                }
+//    180 200 220 240
+//    404 456 508 560
+//    628 712 796 880
+//    852 968 1084 1200
 
-            }
-            ++general_offset_i;
-            if (general_offset_i >= n)/// If rows end
-            {
-                signal_i = false;
-                for (int k = 0; k <= last_active_process; ++k)/// If last signal is needed
-                {
-                    if (k != q)
-                    {
-                        MPI_Send(&signal_i, 1, MPI_CXX_BOOL, k, 0, MPI_COMM_WORLD);
-                    }
-                }
-                break;
-            }
-            signal_i=true;
-            for (int k = 0; k <= last_active_process; ++k)/// Continue
-            {
-                if (k != q)
-                {
-                    MPI_Send(&signal_i, 1, MPI_CXX_BOOL, k, 0, MPI_COMM_WORLD);
-                }
-            }
-        }
-        general_offset_i = 0;
-        general_offset_j += p;
-        if (general_offset_j >= n) /// If work done
-        {
-            signal_j=false;
-            for (int k = 0; k <= last_active_process; ++k)/// If last signal is needed
-            {
-                if (k != q)
-                {
-                    MPI_Send(&signal_j, 1, MPI_CXX_BOOL, k, 0, MPI_COMM_WORLD);
-                }
-            }
-            break;
-        }
-        last_active_process = n - general_offset_j > p ? p-1 : n - general_offset_j-1;
-        for (int k = 0; k < p; ++k)/// If process is needed
-        {
-            signal_j= k<=last_active_process;
-            if (k != q)
-            {
-                MPI_Send(&signal_j, 1, MPI_CXX_BOOL, k, 0, MPI_COMM_WORLD);
-            }
-        }
-    }*/
-
-    /// Work is done in root process
 
     delete[] buffer;
-//}
-
     delete[] A_row;
     delete[] B_col;
     delete[] C_col;
-
-//    MPI_Finalize();
 
     return 0;
 }
