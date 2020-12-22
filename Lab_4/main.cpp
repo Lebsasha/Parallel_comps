@@ -54,7 +54,7 @@ int main(int argc, char** argv)
 
     computation_time = omp_get_wtime() - computation_time;
     View(D, n, n);
-    cout << "Work is done in time: " << computation_time << endl;
+    cerr << "Work is done in time: " << computation_time << endl;
     delete[] A;
     delete[] B;
     delete[] C;
